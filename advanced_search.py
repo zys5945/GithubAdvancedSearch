@@ -107,9 +107,6 @@ class SearchAction(Action):
                       ' auto-truncating to 1000').format(total_item_count))
                 total_item_count = 1000
 
-            import pdb
-            pdb.set_trace()
-
             items += cur_items
             total_item_acquired = len(items)
 
