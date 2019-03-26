@@ -19,6 +19,7 @@ class Action:
 class MetaData:
     def __index__(self):
         self.oauth_token = None
+        self.first = None
 
 
 class ActionType(Enum):
@@ -53,7 +54,6 @@ class SearchAction(Action):
             }).json()
 
             if self._exceeded_limit(result):
-                print(result)
                 print('exceeded query limit rate, waiting for 1 minute before continuing...')
                 if self._metadata.oauth_token is None:
                     print('you can increase the request per hour to 5000 if you provide an oauth token')
@@ -73,7 +73,12 @@ class SearchAction(Action):
         query_url = search_issue_and_pr_url + \
                     '?q=' + \
                     '+'.join(self._keywords) + \
-                    '+'.join(map(lambda pair: pair[0] + ':' + pair[1], self._qualifiers))
+                    '+'.join(
+                        map(
+                            lambda pair: pair[0] + ':"' + pair[1] + '"',
+                            self._qualifiers
+                        )
+                    )
 
         per_page = 100
         page = 0
@@ -122,7 +127,7 @@ class SearchAction(Action):
                 # got requested items
                 page += 1
 
-        return result
+        return items
 
 
 class AdvancedSearch:
