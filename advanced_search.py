@@ -81,8 +81,7 @@ class SearchAction(Action):
                     )
 
         per_page = 100
-        page = 0
-        total_item_acquired = 0
+        page = 1 # page starts at one, trippy
         total_item_count = None
         overlap = 0
 
@@ -108,7 +107,11 @@ class SearchAction(Action):
                       ' auto-truncating to 1000').format(total_item_count))
                 total_item_count = 1000
 
-            total_item_acquired += len(cur_items)
+            import pdb
+            pdb.set_trace()
+
+            items += cur_items
+            total_item_acquired = len(items)
 
             print('received {0} out of {1} items'.format(total_item_acquired, total_item_count))
 
