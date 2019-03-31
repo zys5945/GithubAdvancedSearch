@@ -1,4 +1,6 @@
 from enum import Enum
+from gql import gql, Client
+from gql.transport.requests import RequestsHTTPTransport
 import requests
 import time
 import math
@@ -7,6 +9,8 @@ rest_base_url = "https://api.github.com/"
 
 rest_search_issue_and_pr_url = rest_base_url + "search/issues"
 
+gql_url = "https://api.github.com/graphql"
+
 
 class PrAndIssueSearch:
     def __init__(self):
@@ -14,6 +18,7 @@ class PrAndIssueSearch:
         self._keywords = [] # list of actual keywords, each keyword must not contain spaces
         self._oauth_token = None
         self._first = None
+        self._fields = None
 
     # metadata
 
@@ -31,7 +36,20 @@ class PrAndIssueSearch:
 
     def execute(self):
         '''
-        :return: an array containing all items matching the search criteria. for the specific structure of each object in the array, refer to github api https://developer.github.com/v3/#pagination
+        this is a two part operation because github graphql api currently does not support all of the qualifiers that the rest api supports, thus we need to get all the node_id from rest api, then query graphql for the specific fields
+        '''
+        self._query_rest_api()
+
+        if self._fields != None:
+            self._query_graphql()
+
+        return self.results
+
+    def _query_rest_api(self):
+        '''
+        populate self.results with an array containing all items matching the search criteria
+        for the specific structure of each object in the array, refer to github api https://developer.github.com/v3/#pagination
+        each element also contains an extra property named "fields", which contains all the fields from graphql
         '''
         query_url = rest_search_issue_and_pr_url + \
                     '?q=' + \
@@ -60,6 +78,8 @@ class PrAndIssueSearch:
                 cur_items = result['items']
             else:
                 cur_items = result['items'][overlap:]
+
+            print(result)
 
             # resolve total item count
             if total_item_count is None:
@@ -90,10 +110,11 @@ class PrAndIssueSearch:
                 # got requested items
                 page += 1
 
-        if len(items) > total_count:
-            items = items[:total_count]
-            
-        return items
+        if len(items) > total_item_count:
+            items = items[:total_item_count]
+
+        self.results = items
+        return results
 
     def _exceeded_limit(self, result):
         '''
@@ -119,6 +140,9 @@ class PrAndIssueSearch:
     def _append_page_param(self, query_url, per_page, page):
         return query_url + '&per_page={0}&page={1}'.format(per_page, page)
 
+    def _query_graphql(self):
+        node_ids = map(lambda result: result['node_id'], self.results)
+
     # query composing methods
     
     def must(self, option, value):
@@ -127,6 +151,19 @@ class PrAndIssueSearch:
 
     def keywords(self, keyword):
         self._keywords += list(filter(None, keyword.split(' ')))
+
+    def fields(self, fields):
+        '''
+        set fields for the graphql query
+        fields should be a string that specifies the fields to retrieve
+        i.e.
+        {
+            nodes {
+                <fields go here>
+            }
+        }
+        '''
+        self._fields = fields
 
     # convenience methods
 
