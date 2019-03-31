@@ -3,74 +3,30 @@ import requests
 import time
 import math
 
-base_url = "https://api.github.com/"
+rest_base_url = "https://api.github.com/"
 
-search_issue_and_pr_url = base_url + "search/issues"
+rest_search_issue_and_pr_url = rest_base_url + "search/issues"
 
 
-class Action:
+class PrAndIssueSearch:
     def __init__(self):
-        self.type = None
-
-    def go(self, current_results, metadata):
-        pass
-
-
-class MetaData:
-    def __index__(self):
-        self.oauth_token = None
-        self.first = None
-
-
-class ActionType(Enum):
-    Search = 0
-
-
-class SearchAction(Action):
-    def __init__(self, metadata=None):
-        super().__init__()
-        self.type = ActionType.Search
         self._qualifiers = [] # list of (option, value)
         self._keywords = [] # list of actual keywords, each keyword must not contain spaces
-        self._metadata = metadata
+        self._oauth_token = None
 
-    def add_qualifier(self, option, value):
-        self._qualifiers.append((option, value))
+    # metadata
 
-    def add_keyword(self, keyword):
-        self._keywords += list(filter(None, keyword.split(' ')))
+    def oauth(self, token):
+        self._oauth_token = token
+        return self
 
-    def _exceeded_limit(self, result):
-        '''
-        :param result: object parsed from json response
-        :return: true if limit exceeded
-        '''
-        return result.get('message') is not None
+    # execution
 
-    def _query_until_success(self, query_url):
-        while True:
-            result = requests.get(query_url, headers={
-                'Authorization' : 'token {0}'.format(self._metadata.oauth_token)
-            }).json()
-
-            if self._exceeded_limit(result):
-                print('exceeded query limit rate, waiting for 1 minute before continuing...')
-                if self._metadata.oauth_token is None:
-                    print('you can increase the request per hour to 5000 if you provide an oauth token')
-                time.sleep(60000)
-            else:
-                return result
-
-    def _append_page_param(self, query_url, per_page, page):
-        return query_url + '&per_page={0}&page={1}'.format(per_page, page)
-
-    def go(self, current_results, metadata):
+    def execute(self):
         '''
         :return: an array containing all items matching the search criteria. for the specific structure of each object in the array, refer to github api https://developer.github.com/v3/#pagination
         '''
-        self._metadata = metadata
-
-        query_url = search_issue_and_pr_url + \
+        query_url = rest_search_issue_and_pr_url + \
                     '?q=' + \
                     '+'.join(self._keywords) + \
                     '+'.join(
@@ -112,8 +68,8 @@ class SearchAction(Action):
 
             print('received {0} out of {1} items'.format(total_item_acquired, total_item_count))
 
-            # break if gotten all items
-            if total_item_acquired >= total_item_count:
+            # break if gotten all items or we paged past the last item
+            if total_item_acquired >= total_item_count or page * per_page >= total_item_count:
                 break
 
             # if query is incomplete, set per_page to a smaller number and try again
@@ -129,50 +85,38 @@ class SearchAction(Action):
 
         return items
 
-
-class AdvancedSearch:
-    def __init__(self):
+    def _exceeded_limit(self, result):
         '''
-        list of action items, executed in order
+        :param result: object parsed from json response
+        :return: true if limit exceeded
         '''
-        self._execution_stack = []
+        return result.get('message') is not None
 
-        self._metadata = MetaData()
+    def _query_until_success(self, query_url):
+        while True:
+            result = requests.get(query_url, headers={
+                'Authorization' : 'token {0}'.format(self._oauth_token)
+            }).json()
 
-    def oauth(self, token):
-        self._metadata.oauth_token = token
-        return self
+            if self._exceeded_limit(result):
+                print('exceeded query limit rate, waiting for 1 minute before continuing...')
+                if self._oauth_token is None:
+                    print('you can increase the request per hour to 5000 if you provide an oauth token')
+                time.sleep(60000)
+            else:
+                return result
 
-    def go(self):
-        if len(self._execution_stack) == 0:
-            raise RuntimeError('no search criteria specified')
-            
-        if self._execution_stack[0].type != ActionType.Search:
-            raise RuntimeError('first action must be search')
-            
-        results = None
-
-        for i in range(0, len(self._execution_stack)):
-            results = self._execution_stack[i].go(results, self._metadata)
-
-        return results
+    def _append_page_param(self, query_url, per_page, page):
+        return query_url + '&per_page={0}&page={1}'.format(per_page, page)
 
     # query composing methods
-
-    def _ensure_last_action_search(self):
-        if len(self._execution_stack) == 0 or self._execution_stack[-1].type != ActionType.Search:
-            self._execution_stack.append(SearchAction())
-        
-        return self._execution_stack[-1]
     
     def must(self, option, value):
-        last_action = self._ensure_last_action_search()
-        last_action.add_qualifier(option, value)
+        self._qualifiers.append((option, value))
         return self
 
     def keywords(self, keyword):
-        last_action = self._ensure_last_action_search()
-        last_action.add_keyword(value)
+        self._keywords += list(filter(None, keyword.split(' ')))
 
     # convenience methods
 
@@ -267,4 +211,4 @@ class AdvancedSearch:
         return self.must('team-review-requested', teamname)
 
 
-__all__ = [ 'AdvancedSearch' ]
+__all__ = [ 'PrAndIssueSearch' ]
