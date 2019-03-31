@@ -13,11 +13,18 @@ class PrAndIssueSearch:
         self._qualifiers = [] # list of (option, value)
         self._keywords = [] # list of actual keywords, each keyword must not contain spaces
         self._oauth_token = None
+        self._first = None
 
     # metadata
 
     def oauth(self, token):
         self._oauth_token = token
+        return self
+
+    def first(self, num):
+        if num < 0:
+            raise RuntimeError('illegal value {0}'.format(num))
+        self._first = num
         return self
 
     # execution
@@ -38,7 +45,7 @@ class PrAndIssueSearch:
 
         per_page = 100
         page = 1 # page starts at one, trippy
-        total_item_count = None
+        total_item_count = None if self._first is None else self._first
         overlap = 0
 
         items = []
@@ -83,6 +90,9 @@ class PrAndIssueSearch:
                 # got requested items
                 page += 1
 
+        if len(items) > total_count:
+            items = items[:total_count]
+            
         return items
 
     def _exceeded_limit(self, result):
