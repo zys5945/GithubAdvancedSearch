@@ -1,6 +1,7 @@
 from enum import Enum
-from gql import gql, Client
-from gql.transport.requests import RequestsHTTPTransport
+from functools import reduce
+import gql
+import gql.transport.requests as gql_requests
 import requests
 import time
 import math
@@ -16,9 +17,15 @@ class PrAndIssueSearch:
     def __init__(self):
         self._qualifiers = [] # list of (option, value)
         self._keywords = [] # list of actual keywords, each keyword must not contain spaces
+
         self._oauth_token = None
         self._first = None
+
         self._fields = None
+        self._fragments = None
+
+        self._results = None
+        self._result_node_id_to_index = None
 
     # metadata
 
@@ -40,14 +47,17 @@ class PrAndIssueSearch:
         '''
         self._query_rest_api()
 
-        if self._fields != None:
+        if self._fields is not None:
+            if self._oauth_token is None:
+                raise RuntimeError('oauth token must be provided if graphql api is used')
+
             self._query_graphql()
 
-        return self.results
+        return self._results
 
     def _query_rest_api(self):
         '''
-        populate self.results with an array containing all items matching the search criteria
+        populate self._results with an array containing all items matching the search criteria
         for the specific structure of each object in the array, refer to github api https://developer.github.com/v3/#pagination
         each element also contains an extra property named "fields", which contains all the fields from graphql
         '''
@@ -78,8 +88,6 @@ class PrAndIssueSearch:
                 cur_items = result['items']
             else:
                 cur_items = result['items'][overlap:]
-
-            print(result)
 
             # resolve total item count
             if total_item_count is None:
@@ -113,8 +121,13 @@ class PrAndIssueSearch:
         if len(items) > total_item_count:
             items = items[:total_item_count]
 
-        self.results = items
-        return results
+        self._results = items
+        self._result_node_id_to_index = {}
+
+        for i, result in enumerate(self._results):
+            self._result_node_id_to_index[result['node_id']] = i
+
+        return self._results
 
     def _exceeded_limit(self, result):
         '''
@@ -141,7 +154,40 @@ class PrAndIssueSearch:
         return query_url + '&per_page={0}&page={1}'.format(per_page, page)
 
     def _query_graphql(self):
-        node_ids = map(lambda result: result['node_id'], self.results)
+        node_ids = list(map(lambda result: result['node_id'], self._results))
+        node_ids_string = '[ ' + reduce(lambda prev, next: prev + '"' + str(next) + '", ', node_ids, '') + ']'
+
+        print(node_ids_string) # TODO
+
+        gql_client = gql.Client(
+            transport=gql_requests.RequestsHTTPTransport(
+                url=gql_url,
+                headers={
+                    'Authorization': 'token 4536f616c8c88a2b31e7748b481053cf8c409757',
+                },
+                use_json=True,
+            )
+        )
+
+        gql_query = """
+        {{
+            nodes(ids: {0}){{
+                {1}
+            }}
+        }}
+        {2}
+        """.format(
+            node_ids_string,
+            self._fields,
+            ('' if self._fragments is None else self._fragments),
+        )
+
+        nodes_fields = gql_client.execute(gql.gql(gql_query))['nodes']
+
+        for i, node_fields in enumerate(nodes_fields):
+            self._results[self._result_node_id_to_index[node_ids[i]]]['fields'] = node_fields
+
+        return self._results
 
     # query composing methods
     
@@ -152,18 +198,21 @@ class PrAndIssueSearch:
     def keywords(self, keyword):
         self._keywords += list(filter(None, keyword.split(' ')))
 
-    def fields(self, fields):
+    def fields(self, fields, fragments=None):
         '''
         set fields for the graphql query
-        fields should be a string that specifies the fields to retrieve
+        fields and fragments should be gql strings
         i.e.
         {
             nodes {
                 <fields go here>
             }
         }
+        <fragments go here>
         '''
         self._fields = fields
+        self._fragments = fragments
+        return self
 
     # convenience methods
 
