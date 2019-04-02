@@ -72,4 +72,4 @@ Most of the qualifiers are missing from the v4 (graphql) api, thus we need the v
 
 Go to your github profile page -> Developer Settings -> Personal Access Tokens and click on "Generate new token".
 
-You do not need to grant it any access.
+You do not need to grant it any access if you are only searching for and within public repos.
