@@ -1,5 +1,7 @@
 from enum import Enum
 from functools import reduce
+import math
+import copy
 import gql
 import gql.transport.requests as gql_requests
 import requests
@@ -11,6 +13,35 @@ rest_base_url = "https://api.github.com/"
 rest_search_issue_and_pr_url = rest_base_url + "search/issues"
 
 gql_url = "https://api.github.com/graphql"
+
+
+def cross_filter(keep, test, fn):
+    '''
+    given two lists of results keep and test, for each element in keep, run the function against the test list as to filter the keep list
+    :param fn with signature fn(item, test_list, context, keep_list, item_index) -> bool, context
+        return must be a list or tuple (which is treated as [bool, context]) or a bool by itself
+        bool indicates whether the item should be kept or not
+        context is an optional object returned by the function, passed to the next function call
+    '''
+    kept_items = []
+    context = None
+
+    for i, item in enumerate(keep):
+        result = fn(item, test, context, keep, i)
+
+        if not (type(result) is list or type(result) is tuple or type(result) is bool):
+            raise RuntimeError('invalid result type {0}'.format(type(result)))
+
+        if type(result) is not bool:
+            context = result[1]
+            keep_cur_item = result[0]
+        else:
+            keep_cur_item = result
+
+        if keep_cur_item:
+            kept_items.append(item)
+    
+    return kept_items
 
 
 class PrAndIssueSearch:
@@ -26,6 +57,23 @@ class PrAndIssueSearch:
 
         self._results = None
         self._result_node_id_to_index = None
+
+    def clone(self):
+        clone = PrAndIssueSearch()
+
+        clone._qualifiers = copy.deepcopy(self._qualifiers)
+        clone._keywords = copy.deepcopy(self._keywords)
+
+        clone._oauth_token = copy.deepcopy(self._oauth_token)
+        clone._first = copy.deepcopy(self._first)
+
+        clone._fields = copy.deepcopy(self._fields)
+        clone._fragments = copy.deepcopy(self._fragments)
+
+        clone._results = copy.deepcopy(self._results)
+        clone._result_node_id_to_index = copy.deepcopy(self._result_node_id_to_index)
+
+        return clone
 
     # metadata
 
@@ -90,7 +138,7 @@ class PrAndIssueSearch:
                 cur_items = result['items'][overlap:]
 
             # resolve total item count
-            if total_item_count is None:
+            if total_item_count is None or total_item_count > result['total_count']:
                 total_item_count = result['total_count']
 
             if total_item_count > 1000:
@@ -154,10 +202,15 @@ class PrAndIssueSearch:
         return query_url + '&per_page={0}&page={1}'.format(per_page, page)
 
     def _query_graphql(self):
-        node_ids = list(map(lambda result: result['node_id'], self._results))
-        node_ids_string = '[ ' + reduce(lambda prev, next: prev + '"' + str(next) + '", ', node_ids, '') + ']'
+        all_node_ids = list(map(lambda result: result['node_id'], self._results))
 
-        print(node_ids_string) # TODO
+        for i in range(math.ceil(len(all_node_ids) / 100)): # only 100 ids can be queried at once
+            self._query_graphql_using_ids(all_node_ids[i * 100: (i + 1) * 100])
+
+        return self._results
+
+    def _query_graphql_using_ids(self, node_ids):
+        node_ids_string = '[ ' + reduce(lambda prev, next: prev + '"' + str(next) + '", ', node_ids, '') + ']'
 
         gql_client = gql.Client(
             transport=gql_requests.RequestsHTTPTransport(
@@ -189,6 +242,7 @@ class PrAndIssueSearch:
 
         return self._results
 
+
     # query composing methods
     
     def must(self, option, value):
@@ -214,7 +268,7 @@ class PrAndIssueSearch:
         self._fragments = fragments
         return self
 
-    # convenience methods
+    # convenience query construction methods
 
     def user(self, username):
         return self.must('user', username)
@@ -305,6 +359,14 @@ class PrAndIssueSearch:
 
     def team_review_requested(self, teamname):
         return self.must('team-review-requested', teamname)
+
+    # other utility methods
+
+    def cross_filter(self, search_result, fn):
+        if self._results is None:
+            return []
+
+        return cross_filter(self._results, search_result, fn)
 
 
 __all__ = [ 'PrAndIssueSearch' ]
