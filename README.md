@@ -51,7 +51,7 @@ interested_issue_numbers = list(map(lambda issue: issue['number'], interested_is
 pprint(interested_issue_numbers)
 ```
 
-For the specifics of the api, especially the graphql syntax, please visit github documentation on the respective api.
+For the specifics of the api, especially the graphql syntax, please visit github documentation.
 
 https://developer.github.com/v3/
 
