@@ -39,9 +39,9 @@ def filter_fn(issue, prs, context, issues, issue_index):
 
     for pr in prs:
         if issue_number_string in pr['fields']['bodyText']:
-            return Fals
+            return False
 
-    return False
+    return True
 
 interested_issues = cross_filter(issues, all_open_prs, filter_fn)
 
