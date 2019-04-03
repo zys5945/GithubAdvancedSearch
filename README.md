@@ -38,9 +38,8 @@ def filter_fn(issue, prs, context, issues, issue_index):
     issue_number_string = str(issue['number'])
 
     for pr in prs:
-        for comment in pr['fields']['comments']['nodes']:
-            if issue_number_string in comment['bodyText']:
-                return True
+        if issue_number_string in pr['fields']['bodyText']:
+            return Fals
 
     return False
 
