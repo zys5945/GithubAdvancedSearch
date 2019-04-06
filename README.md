@@ -25,11 +25,7 @@ all_open_prs = base_search.clone() \
 .is_('pr') \
 .fields("""
     ... on PullRequest{
-        comments(first: 3){
-            nodes{
-                bodyText
-            }
-        }
+        bodyText
     }
 """) \
 .execute()
