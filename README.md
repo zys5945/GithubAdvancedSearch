@@ -1,6 +1,6 @@
-# GithubAdvancedSearch
+# GithubUtility
 
-This project aims to provide a python api for the github search API (both the v3 REST api and v4 graphql api), while also adding extra functionalities.
+This project aims to provide a python api for the github search API (both v3 and v4), while also adding extra functionalities.
 
 ## Example
 
@@ -11,7 +11,6 @@ from advanced_search import PrAndIssueSearch, cross_filter
 from pprint import pprint
 
 base_search = PrAndIssueSearch() \
-.oauth('<your oauth token goes here>') \
 .repo('pandas-dev/pandas')
 
 issues = base_search.clone() \
