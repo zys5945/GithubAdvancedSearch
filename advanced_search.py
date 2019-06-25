@@ -1,4 +1,3 @@
-from enum import Enum
 from functools import reduce
 import math
 import copy
@@ -8,12 +7,10 @@ import requests
 import time
 import math
 
-rest_base_url = "https://api.github.com/"
+from common import rest_base_url, gql_url
+from auth import AuthCreds, AuthType
 
 rest_search_issue_and_pr_url = rest_base_url + "search/issues"
-
-gql_url = "https://api.github.com/graphql"
-
 
 def cross_filter(keep, test, fn):
     '''
@@ -49,7 +46,7 @@ class PrAndIssueSearch:
         self._qualifiers = [] # list of (option, value)
         self._keywords = [] # list of actual keywords, each keyword must not contain spaces
 
-        self._oauth_token = None
+        self._auth_creds = None
         self._first = None
 
         self._fields = None
@@ -64,7 +61,7 @@ class PrAndIssueSearch:
         clone._qualifiers = copy.deepcopy(self._qualifiers)
         clone._keywords = copy.deepcopy(self._keywords)
 
-        clone._oauth_token = copy.deepcopy(self._oauth_token)
+        clone._auth_creds = None if clone._auth_creds is None else self._auth_creds.clone()
         clone._first = copy.deepcopy(self._first)
 
         clone._fields = copy.deepcopy(self._fields)
@@ -77,8 +74,12 @@ class PrAndIssueSearch:
 
     # metadata
 
-    def oauth(self, token):
-        self._oauth_token = token
+    def auth(self, auth_creds):
+        if not isinstance(auth_creds, AuthCreds):
+            raise ValueError('Expecting an AuthCreds, got {}'.format(auth_creds))
+
+        self._auth_creds = auth_creds
+
         return self
 
     def first(self, num):
@@ -96,7 +97,7 @@ class PrAndIssueSearch:
         self._query_rest_api()
 
         if self._fields is not None:
-            if self._oauth_token is None:
+            if self._auth_creds is None or not self._auth_creds.is_oauth():
                 raise RuntimeError('oauth token must be provided if graphql api is used')
 
             self._query_graphql()
@@ -127,7 +128,27 @@ class PrAndIssueSearch:
         items = []
 
         while True: # scroll through all pages
-            result = self._query_until_success(self._append_page_param(query_url, per_page, page))
+            paged_query_url = query_url + '&per_page={0}&page={1}'.format(per_page, page)
+
+            # query repeatedly until success
+
+            session = requests.Session()
+            prepared_request = requests.Request('GET', query_url).prepare()
+            if self._auth_creds is not None:
+                self._auth_creds.write_headers(prepared_request)
+
+            while True:
+                result = session.send(prepared_request).json()
+
+                if self._exceeded_limit(result):
+                    print('exceeded query limit rate, waiting for 1 minute before continuing...')
+                    if self._auth_creds is None:
+                        print('you can raise the limit of request per hour to 5000 if you provide an oauth token')
+                    time.sleep(60000)
+                else:
+                    return result
+
+            # parse return
 
             cur_items = None
 
@@ -184,23 +205,6 @@ class PrAndIssueSearch:
         '''
         return result.get('message') is not None
 
-    def _query_until_success(self, query_url):
-        while True:
-            result = requests.get(query_url, headers={
-                'Authorization' : 'token {0}'.format(self._oauth_token)
-            }).json()
-
-            if self._exceeded_limit(result):
-                print('exceeded query limit rate, waiting for 1 minute before continuing...')
-                if self._oauth_token is None:
-                    print('you can increase the request per hour to 5000 if you provide an oauth token')
-                time.sleep(60000)
-            else:
-                return result
-
-    def _append_page_param(self, query_url, per_page, page):
-        return query_url + '&per_page={0}&page={1}'.format(per_page, page)
-
     def _query_graphql(self):
         all_node_ids = list(map(lambda result: result['node_id'], self._results))
 
@@ -215,9 +219,7 @@ class PrAndIssueSearch:
         gql_client = gql.Client(
             transport=gql_requests.RequestsHTTPTransport(
                 url=gql_url,
-                headers={
-                    'Authorization': 'token 4536f616c8c88a2b31e7748b481053cf8c409757',
-                },
+                headers=self._auth_creds.get_headers(),
                 use_json=True,
             )
         )
