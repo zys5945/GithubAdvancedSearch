@@ -7,13 +7,10 @@ import requests
 import time
 import math
 
-from ..common import rest_base_url, gql_url
 from ..auth import AuthCreds, AuthType
+from ..v3 import send as send_v3
+from ..v4 import send as send_v4
 from .cross_filter import cross_filter
-
-
-rest_search_issue_and_pr_url = rest_base_url + "search/issues"
-
 
 class PrAndIssueSearch:
     def __init__(self):
@@ -84,7 +81,7 @@ class PrAndIssueSearch:
         for the specific structure of each object in the array, refer to github api https://developer.github.com/v3/#pagination
         each element also contains an extra property named "fields", which contains all the fields from graphql
         '''
-        query_url = rest_search_issue_and_pr_url + \
+        query_url = 'search/issues' + \
                     '?q=' + \
                     '+'.join(self._keywords) + \
                     '+'.join(
@@ -94,7 +91,7 @@ class PrAndIssueSearch:
                         )
                     )
 
-        per_page = 100
+        per_page = 100 # maximum of 100 results can be returned per request
         page = 1 # page starts at one, trippy
         total_item_count = None if self._first is None else self._first
         overlap = 0
@@ -104,23 +101,7 @@ class PrAndIssueSearch:
         while True: # scroll through all pages
             paged_query_url = query_url + '&per_page={0}&page={1}'.format(per_page, page)
 
-            # query repeatedly until success
-
-            session = requests.Session()
-            prepared_request = requests.Request('GET', query_url).prepare()
-            if self._auth_creds is not None:
-                self._auth_creds.write_headers(prepared_request)
-
-            while True:
-                result = session.send(prepared_request).json()
-
-                if self._exceeded_limit(result):
-                    print('exceeded query limit rate, waiting for 1 minute before continuing...')
-                    if self._auth_creds is None:
-                        print('you can raise the limit of request per hour to 5000 if you provide an oauth token')
-                    time.sleep(60000)
-                else:
-                    return result
+            result = send_v3('GET', paged_query_url,headers=None if self._auth_creds is None else self._auth_creds.get_headers()).json()
 
             # parse return
 
@@ -172,13 +153,6 @@ class PrAndIssueSearch:
 
         return self._results
 
-    def _exceeded_limit(self, result):
-        '''
-        :param result: object parsed from json response
-        :return: true if limit exceeded
-        '''
-        return result.get('message') is not None
-
     def _query_graphql(self):
         all_node_ids = list(map(lambda result: result['node_id'], self._results))
 
@@ -189,14 +163,6 @@ class PrAndIssueSearch:
 
     def _query_graphql_using_ids(self, node_ids):
         node_ids_string = '[ ' + reduce(lambda prev, next: prev + '"' + str(next) + '", ', node_ids, '') + ']'
-
-        gql_client = gql.Client(
-            transport=gql_requests.RequestsHTTPTransport(
-                url=gql_url,
-                headers=self._auth_creds.get_headers(),
-                use_json=True,
-            )
-        )
 
         gql_query = """
         {{
@@ -211,7 +177,7 @@ class PrAndIssueSearch:
             ('' if self._fragments is None else self._fragments),
         )
 
-        nodes_fields = gql_client.execute(gql.gql(gql_query))['nodes']
+        nodes_fields = send_v4(gql_query)['nodes']
 
         for i, node_fields in enumerate(nodes_fields):
             self._results[self._result_node_id_to_index[node_ids[i]]]['fields'] = node_fields
