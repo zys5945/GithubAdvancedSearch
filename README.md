@@ -7,7 +7,7 @@ This project aims to provide a python api for the github search API (both v3 and
 The following piece of code retrieves all open issues with the label 'good first issue' and does not appear in the body of an open pull request, from pandas github repository:
 
 ```
-from advanced_search import PrAndIssueSearch, cross_filter
+from search import PrAndIssueSearch, cross_filter
 from pprint import pprint
 
 base_search = PrAndIssueSearch() \
