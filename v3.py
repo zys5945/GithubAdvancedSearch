@@ -18,7 +18,7 @@ def send(method, url, headers=None, json=None):
     request = requests.Request(method, url, headers=headers, json=json)
 
     while True:
-        response = session.send(request)
+        response = session.send(session.prepare_request(request))
 
         if response.headers['X-RateLimit-Remaining'] == 0:
             reset_time = datetime.datetime.fromtimestamp(response.headers['X-RateLimit-Reset'])

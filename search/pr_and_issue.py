@@ -1,8 +1,6 @@
 from functools import reduce
 import math
 import copy
-import gql
-import gql.transport.requests as gql_requests
 import requests
 import time
 import math
@@ -32,7 +30,7 @@ class PrAndIssueSearch:
         clone._qualifiers = copy.deepcopy(self._qualifiers)
         clone._keywords = copy.deepcopy(self._keywords)
 
-        clone._auth_creds = None if clone._auth_creds is None else self._auth_creds.clone()
+        clone._auth_creds = None if self._auth_creds is None else self._auth_creds.clone()
         clone._first = copy.deepcopy(self._first)
 
         clone._fields = copy.deepcopy(self._fields)
@@ -164,20 +162,22 @@ class PrAndIssueSearch:
     def _query_graphql_using_ids(self, node_ids):
         node_ids_string = '[ ' + reduce(lambda prev, next: prev + '"' + str(next) + '", ', node_ids, '') + ']'
 
-        gql_query = """
-        {{
-            nodes(ids: {0}){{
-                {1}
+        gql_query = {
+            'query': """
+            {{
+                nodes(ids: {0}){{
+                    {1}
+                }}
             }}
-        }}
-        {2}
-        """.format(
-            node_ids_string,
-            self._fields,
-            ('' if self._fragments is None else self._fragments),
-        )
+            {2}
+            """.format(
+                node_ids_string,
+                self._fields,
+                ('' if self._fragments is None else self._fragments),
+            )
+        }
 
-        nodes_fields = send_v4(gql_query)['nodes']
+        nodes_fields = send_v4(gql_query, self._auth_creds.get_headers()).json()['data']['nodes']
 
         for i, node_fields in enumerate(nodes_fields):
             self._results[self._result_node_id_to_index[node_ids[i]]]['fields'] = node_fields

@@ -57,12 +57,7 @@ https://developer.github.com/v4/
 
 Documentation for non-trivial methods can be found in the source code
 
-### Why complicate things by using both v3 and v4 api at the same time?
-
-The v3 (REST) api provides much richer search functionality at the time of creating this project. 
-Most of the qualifiers are missing from the v4 (graphql) api, and from what I know, v4 does not support search by keywords, thus we need the v3 api for searching purposes. However, v3 lacks the capability of looking up multiple documents with specified fields at once, which is something that graphql is good at, so we also need to use v4 api.
-
-### How to setup the oauth token?
+### How to setup an oauth token?
 
 Go to your github profile page -> Developer Settings -> Personal Access Tokens and click on "Generate new token".
 

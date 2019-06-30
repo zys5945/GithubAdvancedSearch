@@ -22,7 +22,7 @@ class AuthCreds:
         auth = AuthCreds()
 
         auth._creds = copy.deepcopy(self._creds)
-        auth._auth_types = copy.deepcopy(self._auth_types)
+        auth._auth_type = copy.deepcopy(self._auth_type)
 
         return auth
 
