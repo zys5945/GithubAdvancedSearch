@@ -6,7 +6,7 @@ import time
 import math
 
 from ..auth import AuthCreds, AuthType
-from ..v3 import send as send_v3
+from ..v3 import send as send_v3, scroll
 from ..v4 import send as send_v4
 from .cross_filter import cross_filter
 
@@ -89,61 +89,8 @@ class PrAndIssueSearch:
                         )
                     )
 
-        per_page = 100 # maximum of 100 results can be returned per request
-        page = 1 # page starts at one, trippy
-        total_item_count = None if self._first is None else self._first
-        overlap = 0
-
-        items = []
-
-        while True: # scroll through all pages
-            paged_query_url = query_url + '&per_page={0}&page={1}'.format(per_page, page)
-
-            result = send_v3('GET', paged_query_url,headers=None if self._auth_creds is None else self._auth_creds.get_headers()).json()
-
-            # parse return
-
-            cur_items = None
-
-            # deal with overlap
-            if overlap == 0:
-                cur_items = result['items']
-            else:
-                cur_items = result['items'][overlap:]
-
-            # resolve total item count
-            if total_item_count is None or total_item_count > result['total_count']:
-                total_item_count = result['total_count']
-
-            if total_item_count > 1000:
-                print(('query matched {0} results but only the first 1000 search results are available,'
-                      ' auto-truncating to 1000').format(total_item_count))
-                total_item_count = 1000
-
-            items += cur_items
-            total_item_acquired = len(items)
-
-            print('received {0} out of {1} items'.format(total_item_acquired, total_item_count))
-
-            # break if gotten all items or we paged past the last item
-            if total_item_acquired >= total_item_count or page * per_page >= total_item_count:
-                break
-
-            # if query is incomplete, set per_page to a smaller number and try again
-            if result['incomplete_results']:
-                returned_item_length = len(cur_items)
-
-                per_page = returned_item_length
-                page = math.floor(total_item_acquired / returned_item_length)
-                overlap = total_item_acquired - page * per_page
-            else:
-                # got requested items
-                page += 1
-
-        if len(items) > total_item_count:
-            items = items[:total_item_count]
-
-        self._results = items
+        self._results = scroll('GET', query_url, None if self._auth_creds is None else self._auth_creds.get_headers())
+        
         self._result_node_id_to_index = {}
 
         for i, result in enumerate(self._results):
