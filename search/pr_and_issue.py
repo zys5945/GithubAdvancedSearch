@@ -5,18 +5,15 @@ import requests
 import time
 import math
 
+from .search_request import SearchRequest
 from ..auth import AuthCreds, AuthType
 from ..v3 import send as send_v3, scroll
 from ..v4 import send as send_v4
 from .cross_filter import cross_filter
 
-class PrAndIssueSearch:
+class PrAndIssueSearch(SearchRequest):
     def __init__(self):
-        self._qualifiers = [] # list of (option, value)
-        self._keywords = [] # list of actual keywords, each keyword must not contain spaces
-
-        self._auth_creds = None
-        self._first = None
+        super().__init__()
 
         self._fields = None
         self._fragments = None
@@ -25,13 +22,7 @@ class PrAndIssueSearch:
         self._result_node_id_to_index = None
 
     def clone(self):
-        clone = PrAndIssueSearch()
-
-        clone._qualifiers = copy.deepcopy(self._qualifiers)
-        clone._keywords = copy.deepcopy(self._keywords)
-
-        clone._auth_creds = None if self._auth_creds is None else self._auth_creds.clone()
-        clone._first = copy.deepcopy(self._first)
+        clone = super().clone()
 
         clone._fields = copy.deepcopy(self._fields)
         clone._fragments = copy.deepcopy(self._fragments)
@@ -40,22 +31,6 @@ class PrAndIssueSearch:
         clone._result_node_id_to_index = copy.deepcopy(self._result_node_id_to_index)
 
         return clone
-
-    # metadata
-
-    def auth(self, auth_creds):
-        if not isinstance(auth_creds, AuthCreds):
-            raise ValueError('Expecting an AuthCreds, got {}'.format(auth_creds))
-
-        self._auth_creds = auth_creds
-
-        return self
-
-    def first(self, num):
-        if num < 0:
-            raise RuntimeError('illegal value {0}'.format(num))
-        self._first = num
-        return self
 
     # execution
 
@@ -134,13 +109,6 @@ class PrAndIssueSearch:
 
     # query composing methods
     
-    def must(self, option, value):
-        self._qualifiers.append((option, value))
-        return self
-
-    def keywords(self, keyword):
-        self._keywords += list(filter(None, keyword.split(' ')))
-
     def fields(self, fields, fragments=None):
         '''
         set fields for the graphql query
@@ -160,94 +128,94 @@ class PrAndIssueSearch:
     # convenience query construction methods
 
     def user(self, username):
-        return self.must('user', username)
+        return super().must('user', username)
 
     def org(self, orgname):
-        return self.must('org', orgname)
+        return super().must('org', orgname)
 
     def repo(self, reponame):
-        return self.must('repo', reponame)
+        return super().must('repo', reponame)
 
     def is_(self, val):
-        return self.must('is', val)
+        return super().must('is', val)
 
     def type(self, type):
-        return self.must('type', type)
+        return super().must('type', type)
 
     def state(self, state):
-        return self.must('state', state)
+        return super().must('state', state)
 
     def label(self, label):
-        return self.must('label', label)
+        return super().must('label', label)
 
     def status(self, status):
-        return self.must('status', status)
+        return super().must('status', status)
 
     def review(self, review_status):
-        return self.must('review', review_status)
+        return super().must('review', review_status)
 
     def created(self, date_range_expression):
-        return self.must('created', date_range_expression)
+        return super().must('created', date_range_expression)
 
     def updated(self, date_range_expression):
-        return self.must('updated', date_range_expression)
+        return super().must('updated', date_range_expression)
 
     def closed(self, date_range_expression):
-        return self.must('closed', date_range_expression)
+        return super().must('closed', date_range_expression)
 
     def merged(self, date_range_expression):
-        return self.must('merged', date_range_expression)
+        return super().must('merged', date_range_expression)
 
     def head(self, branch_name):
-        return self.must('head', branch_name)
+        return super().must('head', branch_name)
 
     def base(self, branch_name):
-        return self.must('base', branch_name)
+        return super().must('base', branch_name)
 
     def language(self, language):
-        return self.must('language', language)
+        return super().must('language', language)
 
     def comments(self, range_expression):
-        return self.must('comments', range_expression)
+        return super().must('comments', range_expression)
 
     def no(self, metadata):
-        return self.must('no', metadata)
+        return super().must('no', metadata)
 
     def milestone(self, milestone):
-        return self.must('milestone', milestone)
+        return super().must('milestone', milestone)
 
     def project(self, project_board_number):
-        return self.must('project', project_board_number)
+        return super().must('project', project_board_number)
 
     def involves(self, username):
-        return self.must('involves', username)
+        return super().must('involves', username)
 
     def author(self, username):
-        return self.must('author', username)
+        return super().must('author', username)
 
     def assignee(self, username):
-        return self.must('assignee', username)
+        return super().must('assignee', username)
 
     def commenter(self, username):
-        return self.must('commenter', username)
+        return super().must('commenter', username)
 
     def mentions(self, username):
-        return self.must('mentions', username)
+        return super().must('mentions', username)
 
     def team(self, teamname):
-        return self.must('team', teamname)
+        return super().must('team', teamname)
 
     def in_(self, place):
-        return self.must('in', place)
+        return super().must('in', place)
 
     def review_by(self, username):
-        return self.must('review-by', username)
+        return super().must('review-by', username)
 
     def review_requested(self, username):
-        return self.must('review-requested', username)
+        return super().must('review-requested', username)
 
     def team_review_requested(self, teamname):
-        return self.must('team-review-requested', teamname)
+        return super().must('team-review-requested', teamname)
 
     # other utility methods
 
