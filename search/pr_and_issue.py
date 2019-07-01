@@ -36,7 +36,7 @@ class PrAndIssueSearch(SearchRequest):
 
     def execute(self):
         '''
-        this is a two part operation because github graphql api currently does not support all of the qualifiers that the rest api supports, thus we need to get all the node_id from rest api, then query graphql for the specific fields
+        first query v3 for all node_id, then query v4 for fields
         '''
         self._query_rest_api()
 
@@ -54,17 +54,10 @@ class PrAndIssueSearch(SearchRequest):
         for the specific structure of each object in the array, refer to github api https://developer.github.com/v3/#pagination
         each element also contains an extra property named "fields", which contains all the fields from graphql
         '''
-        query_url = 'search/issues' + \
-                    '?q=' + \
-                    '+'.join(self._keywords) + \
-                    '+'.join(
-                        map(
-                            lambda pair: pair[0] + ':"' + pair[1] + '"',
-                            self._qualifiers
-                        )
-                    )
 
-        self._results = scroll('GET', query_url, None if self._auth_creds is None else self._auth_creds.get_headers())
+        query_url = 'search/issues' + self.get_url_parameters()
+
+        self._results = scroll('GET', query_url, self.get_auth_headers())
         
         self._result_node_id_to_index = {}
 
@@ -128,94 +121,94 @@ class PrAndIssueSearch(SearchRequest):
     # convenience query construction methods
 
     def user(self, username):
-        return super().must('user', username)
+        return self.must('user', username)
 
     def org(self, orgname):
-        return super().must('org', orgname)
+        return self.must('org', orgname)
 
     def repo(self, reponame):
-        return super().must('repo', reponame)
+        return self.must('repo', reponame)
 
     def is_(self, val):
-        return super().must('is', val)
+        return self.must('is', val)
 
     def type(self, type):
-        return super().must('type', type)
+        return self.must('type', type)
 
     def state(self, state):
-        return super().must('state', state)
+        return self.must('state', state)
 
     def label(self, label):
-        return super().must('label', label)
+        return self.must('label', label)
 
     def status(self, status):
-        return super().must('status', status)
+        return self.must('status', status)
 
     def review(self, review_status):
-        return super().must('review', review_status)
+        return self.must('review', review_status)
 
     def created(self, date_range_expression):
-        return super().must('created', date_range_expression)
+        return self.must('created', date_range_expression)
 
     def updated(self, date_range_expression):
-        return super().must('updated', date_range_expression)
+        return self.must('updated', date_range_expression)
 
     def closed(self, date_range_expression):
-        return super().must('closed', date_range_expression)
+        return self.must('closed', date_range_expression)
 
     def merged(self, date_range_expression):
-        return super().must('merged', date_range_expression)
+        return self.must('merged', date_range_expression)
 
     def head(self, branch_name):
-        return super().must('head', branch_name)
+        return self.must('head', branch_name)
 
     def base(self, branch_name):
-        return super().must('base', branch_name)
+        return self.must('base', branch_name)
 
     def language(self, language):
-        return super().must('language', language)
+        return self.must('language', language)
 
     def comments(self, range_expression):
-        return super().must('comments', range_expression)
+        return self.must('comments', range_expression)
 
     def no(self, metadata):
-        return super().must('no', metadata)
+        return self.must('no', metadata)
 
     def milestone(self, milestone):
-        return super().must('milestone', milestone)
+        return self.must('milestone', milestone)
 
     def project(self, project_board_number):
-        return super().must('project', project_board_number)
+        return self.must('project', project_board_number)
 
     def involves(self, username):
-        return super().must('involves', username)
+        return self.must('involves', username)
 
     def author(self, username):
-        return super().must('author', username)
+        return self.must('author', username)
 
     def assignee(self, username):
-        return super().must('assignee', username)
+        return self.must('assignee', username)
 
     def commenter(self, username):
-        return super().must('commenter', username)
+        return self.must('commenter', username)
 
     def mentions(self, username):
-        return super().must('mentions', username)
+        return self.must('mentions', username)
 
     def team(self, teamname):
-        return super().must('team', teamname)
+        return self.must('team', teamname)
 
     def in_(self, place):
-        return super().must('in', place)
+        return self.must('in', place)
 
     def review_by(self, username):
-        return super().must('review-by', username)
+        return self.must('review-by', username)
 
     def review_requested(self, username):
-        return super().must('review-requested', username)
+        return self.must('review-requested', username)
 
     def team_review_requested(self, teamname):
-        return super().must('team-review-requested', teamname)
+        return self.must('team-review-requested', teamname)
 
     # other utility methods
 

@@ -20,6 +20,24 @@ class SearchRequest(GithubRequest):
 
         return obj
 
+    def get_url_parameters(self):
+        """does not contain page related parameters, only from keywords and qualifiers
+        Returns:
+            str - url
+        """
+
+        return '?q=' + \
+                '+'.join(self._keywords) + \
+                '+'.join(
+                    map(
+                        lambda pair: pair[0] + ':"' + pair[1] + '"',
+                        self._qualifiers
+                    )
+                )
+
+    def get_auth_headers(self):
+        return None if self._auth_creds is None else self._auth_creds.get_headers()
+
     def first(self, num):
         if num < 0:
             raise RuntimeError('illegal value {0}'.format(num))

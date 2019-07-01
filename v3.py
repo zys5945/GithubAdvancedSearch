@@ -10,6 +10,10 @@ base_url = "https://api.github.com/"
 
 def send(method, url, headers=None, json=None):
     """wait on rate limit exceeded
+
+    str url
+        the relative url to send the request to
+    
     Returns:
         requests.Response
     """
@@ -33,8 +37,6 @@ def send(method, url, headers=None, json=None):
             time.sleep((reset_time - datetime.datetime.now()).total_seconds() + 1)
 
         return response
-
-
 
 
 def scroll(method, url, headers=None, json=None, max_items=None, per_page=100):
